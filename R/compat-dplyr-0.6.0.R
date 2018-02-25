@@ -57,11 +57,11 @@
   register_s3_method("dplyr", "arrange_", "tbl_dt")
   register_s3_method("dplyr", "arrange_", "data.table")
 
-  register_s3_method("dplyr", "select_", "grouped_dt")
+  register_s3_method("dplyr", "select", "grouped_dt")
   register_s3_method("dplyr", "select_", "tbl_dt")
   register_s3_method("dplyr", "select_", "data.table")
 
-  register_s3_method("dplyr", "rename_", "grouped_dt")
+  register_s3_method("dplyr", "rename", "grouped_dt")
   register_s3_method("dplyr", "rename_", "tbl_dt")
   register_s3_method("dplyr", "rename_", "data.table")
 

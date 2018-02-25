@@ -157,33 +157,31 @@ and_expr <- function(exprs) {
 
 filter.data.table <- function(.data, ...) {
   dots <- rlang::enquos(...)
-  filter_(.data, .dots = lazyeval::as.lazy_dots(dots))
+  quo <- dplyr:::all_exprs(!!!dots, .vectorised = TRUE)
+  j <- expr(list(`_row` = .I[!!!quo_squash(quo)]))
+  indices <- dt_subset(.data, , j, quo_get_env(quo))$`_row`
+  .data[indices[!is.na(indices)]]
 }
 
 #' @importFrom dplyr filter_
 filter_.grouped_dt <- function(.data, ..., .dots) {
   grouped_dt(NextMethod(), groups(.data), copy = FALSE)
 }
-filter_.tbl_dt <- function(.data, ..., .dots) {
+filter_.tbl_dt <- function(.data, ..., .dots = list()) {
   tbl_dt(NextMethod(), copy = FALSE)
 }
-filter_.data.table <- function(.data, ..., .dots) {
-  dots <- lazyeval::all_dots(.dots, ...)
-  env <- lazyeval::common_env(dots)
-
-  # http://stackoverflow.com/questions/16573995/subset-by-group-with-data-table
-  expr <- lapply(dots, `[[`, "expr")
-  j <- substitute(list(`_row` = .I[expr]), list(expr = and_expr(expr)))
-  indices <- dt_subset(.data, , j, env)$`_row`
-
-  .data[indices[!is.na(indices)]]
+filter_.data.table <- function(.data, ..., .dots = list()) {
+  dots <- dplyr:::compat_lazy_dots(.dots, caller_env(), ...)
+  filter(.data, !!!dots)
 }
+
 
 # Summarise --------------------------------------------------------------------
 
 summarise.data.table <- function(.data, ...) {
   dots <- rlang::enquos(...)
-  summarise_(.data, .dots = lazyeval::as.lazy_dots(dots))
+  j <- expr(list(!!!lapply(dots, quo_squash)))
+  dt_subset(.data, , j)
 }
 
 #' @importFrom dplyr summarise_
@@ -193,18 +191,25 @@ summarise_.grouped_dt <- function(.data, ..., .dots) {
 summarise_.tbl_dt <- function(.data, ..., .dots) {
   tbl_dt(NextMethod(), copy = FALSE)
 }
-summarise_.data.table <- function(.data, ..., .dots) {
-  dots <- lazyeval::all_dots(.dots, ..., all_named = TRUE)
-
-  j <- lazyeval::make_call(quote(list), dots)
-  dt_subset(.data, , j$expr, env = j$env)
+summarise_.data.table <- function(.data, ..., .dots = list()) {
+  dots <- dplyr:::compat_lazy_dots(.dots, caller_env(), ...)
+  summarise(.data, !!!dots)
 }
 
 # Mutate -----------------------------------------------------------------------
 
 mutate.data.table <- function(.data, ...) {
   dots <- rlang::enquos(...)
-  mutate_(.data, .dots = lazyeval::as.lazy_dots(dots))
+  names <- lapply(names(dots), as.name)
+
+  .data <- data.table::copy(.data)
+  for(i in seq_along(dots)) {
+    # For each new variable, generate a call of the form df[, new := expr]
+   j <- expr(!!names[[i]] := !!!quo_squash(dots[[i]]))
+    .data <- dt_subset(.data, , j)
+  }
+
+  .data[]
 }
 
 #' @importFrom dplyr mutate_
@@ -215,27 +220,17 @@ mutate_.tbl_dt <- function(.data, ..., .dots) {
   tbl_dt(NextMethod(), copy = FALSE)
 }
 mutate_.data.table <- function(.data, ..., .dots) {
-  dots <- lazyeval::all_dots(.dots, ..., all_named = TRUE)
-  names <- lapply(names(dots), as.name)
-
-  # Never want to modify in place
-  .data <- data.table::copy(.data)
-
-  for(i in seq_along(dots)) {
-    # For each new variable, generate a call of the form df[, new := expr]
-    j <- substitute(lhs := rhs, list(lhs = names[[i]], rhs = dots[[i]]$expr))
-    .data <- dt_subset(.data, , j, dots[[i]]$env)
-  }
-
-  # Need to use this syntax to make the output visible (#11).
-  .data[]
+  dots <- dplyr:::compat_lazy_dots(.dots, caller_env(), ...)
+  mutate(.data, !!!dots)
 }
 
 # Arrange ----------------------------------------------------------------------
 
 arrange.data.table <- function(.data, ...) {
   dots <- rlang::enquos(...)
-  arrange_(.data, .dots = lazyeval::as.lazy_dots(dots))
+
+  i <- expr(order(!!!lapply(dots, quo_squash)))
+  dt_subset(.data, i)
 }
 
 #' @importFrom dplyr arrange_
@@ -246,25 +241,23 @@ arrange_.tbl_dt <- function(.data, ..., .dots) {
   tbl_dt(NextMethod(), copy = FALSE)
 }
 arrange_.data.table <- function(.data, ..., .dots) {
-  dots <- lazyeval::all_dots(.dots, ...)
-
-  groups <- lazyeval::as.lazy_dots(groups(.data),
-    env = lazyeval::common_env(dots))
-  i <- lazyeval::make_call(quote(order), c(groups, dots))
-
-  dt_subset(.data, i$expr, , env = i$env)
+  dots <- dplyr:::compat_lazy_dots(.dots, caller_env(), ...)
+  arrange(.data, !!!dots)
 }
 
 # Select -----------------------------------------------------------------------
 
 select.data.table <- function(.data, ...) {
   dots <- rlang::enquos(...)
-  select_(.data, .dots = lazyeval::as.lazy_dots(dots))
+  vars <- dplyr::select_vars_(names(.data), dots)
+  out <- .data[, vars, drop = FALSE, with = FALSE]
+  data.table::setnames(out, names(vars))
+  out
 }
 
 #' @importFrom dplyr select_
-select_.grouped_dt <- function(.data, ..., .dots) {
-  dots <- lazyeval::all_dots(.dots, ...)
+select.grouped_dt <- function(.data, ..., .dots) {
+  dots <- rlang::enquos(...)
   vars <- dplyr::select_vars_(names(.data), dots,
     include = as.character(groups(.data)))
   out <- .data[, vars, drop = FALSE, with = FALSE]
@@ -273,12 +266,8 @@ select_.grouped_dt <- function(.data, ..., .dots) {
   grouped_dt(out, groups(.data), copy = FALSE)
 }
 select_.data.table <- function(.data, ..., .dots) {
-  dots <- lazyeval::all_dots(.dots, ...)
-  vars <- dplyr::select_vars_(names(.data), dots)
-
-  out <- .data[, vars, drop = FALSE, with = FALSE]
-  data.table::setnames(out, names(vars))
-  out
+  dots <- dplyr:::compat_lazy_dots(.dots, caller_env(), ...)
+  select(.data, !!!dots)
 }
 select_.tbl_dt <- function(.data, ..., .dots) {
   tbl_dt(NextMethod(), copy = FALSE)
@@ -288,12 +277,16 @@ select_.tbl_dt <- function(.data, ..., .dots) {
 
 rename.data.table <- function(.data, ...) {
   dots <- enquos(...)
-  rename_(.data, .dots = lazyeval::as.lazy_dots(dots))
+  vars <- dplyr::rename_vars_(names(.data), dots)
+
+  out <- .data[, vars, drop = FALSE, with = FALSE]
+  data.table::setnames(out, names(vars))
+  out
 }
 
 #' @importFrom dplyr rename_
-rename_.grouped_dt <- function(.data, ..., .dots) {
-  dots <- lazyeval::all_dots(.dots, ...)
+rename.grouped_dt <- function(.data, ..., .dots) {
+  dots <- enquos(...)
   vars <- dplyr::rename_vars_(names(.data), dots)
 
   out <- .data[, vars, drop = FALSE, with = FALSE]
@@ -302,12 +295,8 @@ rename_.grouped_dt <- function(.data, ..., .dots) {
   grouped_dt(out, groups(.data), copy = FALSE)
 }
 rename_.data.table <- function(.data, ..., .dots) {
-  dots <- lazyeval::all_dots(.dots, ...)
-  vars <- dplyr::rename_vars_(names(.data), dots)
-
-  out <- .data[, vars, drop = FALSE, with = FALSE]
-  data.table::setnames(out, names(vars))
-  out
+  dots <- dplyr:::compat_lazy_dots(.dots, caller_env(), ...)
+  rename(.data, !!!dots)
 }
 rename_.tbl_dt <- function(.data, ..., .dots) {
   tbl_dt(NextMethod(), copy = FALSE)
@@ -318,7 +307,8 @@ rename_.tbl_dt <- function(.data, ..., .dots) {
 
 slice.data.table <- function(.data, ...) {
   dots <- rlang::enquos(...)
-  slice_(.data, .dots = lazyeval::as.lazy_dots(dots))
+  j <- expr(.SD[c(!!!lapply(dots, quo_squash))])
+  dt_subset(.data, , j)
 }
 
 #' @importFrom dplyr slice_
@@ -329,8 +319,6 @@ slice_.tbl_dt <- function(.data, ..., .dots) {
   tbl_dt(NextMethod(), copy = FALSE)
 }
 slice_.data.table <- function(.data, ..., .dots) {
-  dots <- lazyeval::all_dots(.dots, ..., all_named = TRUE)
-
-  j <- substitute(.SD[rows], list(rows = dots[[1]]$expr))
-  dt_subset(.data, , j)
+  dots <- dplyr:::compat_lazy_dots(.dots, caller_env(), ...)
+  slice(.data, !!!dots)
 }
