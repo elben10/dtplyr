@@ -4,7 +4,8 @@
 #'   S3method(do,data.table)
 #' }
 do.data.table <- function(.data, ...) {
-  do_(.data, .dots = lazyeval::lazy_dots(...))
+  dots <- enquos(...)
+  do_(.data, .dots = lazyeval::as.lazy_dots(dots))
 }
 
 #' @importFrom dplyr do_

@@ -156,7 +156,8 @@ and_expr <- function(exprs) {
 # check warning
 
 filter.data.table <- function(.data, ...) {
-  filter_(.data, .dots = lazyeval::lazy_dots(...))
+  dots <- rlang::enquos(...)
+  filter_(.data, .dots = lazyeval::as.lazy_dots(dots))
 }
 
 #' @importFrom dplyr filter_
@@ -181,7 +182,8 @@ filter_.data.table <- function(.data, ..., .dots) {
 # Summarise --------------------------------------------------------------------
 
 summarise.data.table <- function(.data, ...) {
-  summarise_(.data, .dots = lazyeval::lazy_dots(...))
+  dots <- rlang::enquos(...)
+  summarise_(.data, .dots = lazyeval::as.lazy_dots(dots))
 }
 
 #' @importFrom dplyr summarise_
@@ -201,7 +203,8 @@ summarise_.data.table <- function(.data, ..., .dots) {
 # Mutate -----------------------------------------------------------------------
 
 mutate.data.table <- function(.data, ...) {
-  mutate_(.data, .dots = lazyeval::lazy_dots(...))
+  dots <- rlang::enquos(...)
+  mutate_(.data, .dots = lazyeval::as.lazy_dots(dots))
 }
 
 #' @importFrom dplyr mutate_
@@ -231,7 +234,8 @@ mutate_.data.table <- function(.data, ..., .dots) {
 # Arrange ----------------------------------------------------------------------
 
 arrange.data.table <- function(.data, ...) {
-  arrange_(.data, .dots = lazyeval::lazy_dots(...))
+  dots <- rlang::enquos(...)
+  arrange_(.data, .dots = lazyeval::as.lazy_dots(dots))
 }
 
 #' @importFrom dplyr arrange_
@@ -254,7 +258,8 @@ arrange_.data.table <- function(.data, ..., .dots) {
 # Select -----------------------------------------------------------------------
 
 select.data.table <- function(.data, ...) {
-  select_(.data, .dots = lazyeval::lazy_dots(...))
+  dots <- rlang::enquos(...)
+  select_(.data, .dots = lazyeval::as.lazy_dots(dots))
 }
 
 #' @importFrom dplyr select_
@@ -282,7 +287,8 @@ select_.tbl_dt <- function(.data, ..., .dots) {
 # Rename -----------------------------------------------------------------------
 
 rename.data.table <- function(.data, ...) {
-  rename_(.data, .dots = lazyeval::lazy_dots(...))
+  dots <- enquos(...)
+  rename_(.data, .dots = lazyeval::as.lazy_dots(dots))
 }
 
 #' @importFrom dplyr rename_
@@ -311,7 +317,8 @@ rename_.tbl_dt <- function(.data, ..., .dots) {
 # Slice -------------------------------------------------------------------
 
 slice.data.table <- function(.data, ...) {
-  slice_(.data, .dots = lazyeval::lazy_dots(...))
+  dots <- rlang::enquos(...)
+  slice_(.data, .dots = lazyeval::as.lazy_dots(dots))
 }
 
 #' @importFrom dplyr slice_
@@ -323,8 +330,7 @@ slice_.tbl_dt <- function(.data, ..., .dots) {
 }
 slice_.data.table <- function(.data, ..., .dots) {
   dots <- lazyeval::all_dots(.dots, ..., all_named = TRUE)
-  env <- lazyeval::common_env(dots)
 
   j <- substitute(.SD[rows], list(rows = dots[[1]]$expr))
-  dt_subset(.data, , j, env)
+  dt_subset(.data, , j)
 }

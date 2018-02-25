@@ -48,7 +48,7 @@ is.grouped_dt <- function(x) inherits(x, "grouped_dt")
 
 print.grouped_dt <- function(x, ..., n = NULL, width = NULL) {
   cat("Source: local data table ", dplyr::dim_desc(x), "\n", sep = "")
-  cat("Groups: ", commas(deparse_all(dplyr::groups(x))), "\n", sep = "")
+  cat("Groups: ", commas(deparse_all(dplyr::groups(x)))," [", n_groups(x), "]", "\n", sep = "")
   cat("\n")
   print(dplyr::trunc_mat(x, n = n, width = width))
   invisible(x)
@@ -58,14 +58,17 @@ group_size.grouped_dt <- function(x) {
   dplyr::summarise_(x, n = ~n())$n
 }
 
+#' @importFrom dplyr n_groups
 n_groups.grouped_dt <- function(x) {
   nrow(dt_subset(x, , quote(list(1))))
 }
 
 #' @importFrom dplyr group_by_
 group_by.data.table <- function(.data, ..., add = FALSE) {
-  group_by_(.data, .dots = lazyeval::lazy_dots(...), add = add)
+  dots <- rlang::enquos(...)
+  group_by_(.data, .dots = lazyeval::as.lazy_dots(dots), add = add)
 }
+
 group_by_.data.table <- function(.data, ..., .dots, add = FALSE) {
   groups <- dplyr::group_by_prepare(.data, ..., .dots = .dots, add = add)
   grouped_dt(groups$data, groups$groups)

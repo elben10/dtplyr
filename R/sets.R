@@ -2,7 +2,8 @@
 # Set operations ---------------------------------------------------------------
 
 distinct.data.table <- function(.data, ..., .keep_all = FALSE) {
-  distinct_(.data, .dots = lazyeval::lazy_dots(...), .keep_all = .keep_all)
+  dots <- rlang::enquos(...)
+  distinct_(.data, .dots = lazyeval::as.lazy_dots(dots), .keep_all = .keep_all)
 }
 
 #' @importFrom dplyr distinct_

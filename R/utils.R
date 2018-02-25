@@ -5,6 +5,8 @@ dt_subset <- function(dt, i, j, env = parent.frame(), sd_cols = NULL) {
   env <- new.env(parent = env, size = 2L)
   env$`_dt` <- dt
   env$`_vars` <- deparse_all(groups(dt))
+  env$`[` <- `[`
+  env$`list` <- `list`
 
   args <- list(
     i = if (missing(i)) quote(expr =) else dt_replace(i),
@@ -65,3 +67,9 @@ names2 <- function(x) {
 
 "%||%" <- function(x, y) if(is.null(x)) y else x
 
+as.lazy.quosure <- function(x, env = baseenv()) lazyeval::lazy_(rlang::quo_get_expr(x), quo_get_env(x))
+
+
+as.lazy_dots.quosures <- function(x, env = baseenv()) {
+  structure(lapply(x, lazyeval::as.lazy, env = env), class = "lazy_dots")
+}
